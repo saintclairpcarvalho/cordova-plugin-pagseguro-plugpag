@@ -21,7 +21,7 @@ import br.com.uol.pagseguro.plugpag.PlugPagEventData;
 import br.com.uol.pagseguro.plugpag.PlugPagEventListener;
 import br.com.uol.pagseguro.plugpag.PlugPagPaymentData;
 import br.com.uol.pagseguro.plugpag.PlugPagTransactionResult;
-
+import br.com.uol.pagseguro.plugpag.PlugPagAuthenticationListener;
 
 /**
  * This class echoes a string called from JavaScript.
@@ -143,21 +143,43 @@ public class PlugPag extends CordovaPlugin {
   }
 
   public void ShowAuthenticationActivity(final CallbackContext callbackContext) {
+      //Solicita as permissoes necessarias
+      String [] permissions = { 
+	"android.permission.ACCESS_COARSE_LOCATION", 
+	"android.permission.ACCESS_FINE_LOCATION", 
+	"android.permission.INTERNET", 
+	"android.permission.BLUETOOTH",
+	"android.permission.BLUETOOTH_ADMIN",
+	"android.permission.READ_EXTERNAL_STORAGE",
+	"android.permission.WRITE_EXTERNAL_STORAGE",
+	"android.permission.READ_PHONE_STATE",
+	"android.permission.ACCESS_NETWORK_STATE"
+      };
+      cordova.requestPermissions(this, 0, permissions);
+
       Context context = this.cordova.getActivity().getApplicationContext();
-    Activity activity = this.cordova.getActivity();
+      Activity activity = this.cordova.getActivity();
 
-    // Cria a identificação do aplicativo
-    PlugPagAppIdentification appIdentification = new PlugPagAppIdentification("Application","0.0.1");
+      // Cria a identificação do aplicativo
+      PlugPagAppIdentification appIdentification = new PlugPagAppIdentification("Application","0.0.1");
 
-    // Cria a referência do PlugPag
-    br.com.uol.pagseguro.plugpag.PlugPag plugpag = new br.com.uol.pagseguro.plugpag.PlugPag(context,appIdentification);
-    try{
+      // Cria a referência do PlugPag
+      br.com.uol.pagseguro.plugpag.PlugPag plugpag = new br.com.uol.pagseguro.plugpag.PlugPag(activity,appIdentification);
+
+      // Implementa a interface PlugPagAuthenticationListener
+      PlugPagAuthenticationListener authListener = 
+        new PlugPagAuthenticationListener() {
+          @Override
+          public void onSuccess() { 
+              callbackContext.success();
+          }
+          @Override
+          public void onError() {
+              callbackContext.error("erro");
+          }
+      };
       // Solicita autenticação
-      plugpag.requestAuthentication(activity);
-      callbackContext.success();
-    }catch (Exception ex){
-      callbackContext.error(ex.getMessage());
-    }
+      plugpag.requestAuthentication(authListener);
   }
 
   /** Method to test the device connection
@@ -170,13 +192,18 @@ public class PlugPag extends CordovaPlugin {
       PlugPagAppIdentification appIdentification = new PlugPagAppIdentification("Application","0.0.1");
       // Cria a referência do PlugPag
       br.com.uol.pagseguro.plugpag.PlugPag plugpag = new br.com.uol.pagseguro.plugpag.PlugPag(context, appIdentification);
-      PlugPagTransactionResult initResult = plugpag.initBTConnection(device);
+      int initResult = plugpag.initBTConnection(device);
 
-      JSONObject result = new JSONObject();
-      result.put("Message",initResult.getMessage());
-      result.put("Result",initResult.getResult());
-
-      callbackContext.success(result);
+      if (initResult == br.com.uol.pagseguro.plugpag.PlugPag.RET_OK) {
+         JSONObject result = new JSONObject();
+         result.put("Message","RET_OK");
+         result.put("Result",initResult);
+         callbackContext.success(result);
+      } else {
+         JSONObject result = new JSONObject();
+         result.put("Result",initResult);
+	 callbackContext.error(result);
+      }
   }
 
   /**
@@ -195,21 +222,20 @@ public class PlugPag extends CordovaPlugin {
             amount,
             InstallmentType,
             installments,
-            "CODVENDA");
+            SaleRef);
     // Cria a identificação do aplicativo
     PlugPagAppIdentification appIdentification = new PlugPagAppIdentification("Application","0.0.1");
     // Cria a referência do PlugPag
         br.com.uol.pagseguro.plugpag.PlugPag plugpag = new br.com.uol.pagseguro.plugpag.PlugPag(context, appIdentification);
         // Prepara conexão bluetooth e faz o pagamento
-        PlugPagTransactionResult initResult = plugpag.initBTConnection(device);
-        if (initResult.getResult() == br.com.uol.pagseguro.plugpag.PlugPag.RET_OK) {
-
+        int initResult = plugpag.initBTConnection(device);
+        if (initResult == br.com.uol.pagseguro.plugpag.PlugPag.RET_OK) {
           PlugPagTransactionResult result = plugpag.doPayment(paymentData);
-
           JSONObject transactionResult = this.GetTransactionResultStr(result);
-
           callbackContext.success(transactionResult);
-        }
+        } else {
+    	  callbackContext.error("erro");
+	}
   }
 
   private JSONObject GetTransactionResultStr(PlugPagTransactionResult result) throws JSONException {
