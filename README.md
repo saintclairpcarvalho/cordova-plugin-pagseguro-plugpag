@@ -1,2 +1,2 @@
 # cordova-plugin-pagseguro-plugpag
-Plugin to interact with PagSeguro devices in hybrid apps.
+Neste fork a versão da API PlugPag do Pagseguro foi substituída pela versão 3.1.2
